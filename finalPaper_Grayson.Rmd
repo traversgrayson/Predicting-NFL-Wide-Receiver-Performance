@@ -1,0 +1,338 @@
+---
+title: "Predicting Wide Receiver Performance in the National Football League"
+author: "Travers Parsons-Grayson"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+# Abstract
+The National Football League (NFL) is both popular and profitable. It is important that management of NFL teams is able to properly assess which players will succeed once drafted. We fit a multiple linear regression model to predict performance of NFL rookies from college and NFL Combine data. The model was fit by first conducting a series of univariate analyses to determine which variables were good predictors of NFL performance. We then added those predictors to our full model and used backward selection to keep only those predictors significant in the full model. The predictors in the full model were height (of a player), weight, yards in final year of college, and a height-weight interaction term. The final model had an r-squared of 0.18. Our model predicts that players with large height and weight who accumulate many yards will have the most success in their rookie year. Despite the shortcomings of the model, it provides several easy-to-measure superficial attributes to predict success of wide receivers in their rookie year.
+
+# Introduction
+
+In 1972, football passed baseball as the most popular sport in America and has held that title ever since.^[Norman, Jim. "Football Still Americans' Favorite Sport to Watch." Gallup.com. January 04, 2018. Accessed December 08, 2018. https://news.gallup.com/poll/224864/football-americans-favorite-sport-watch.aspx. ] The National Football League (NFL) is by far the most profitable sports league in the world, bringing in an estimated fourteen billion dollars a year.^[Novy-Williams, Eben. "Trump Trash Talk Can't Touch NFL, Packers Financials Reveal." Bloomberg.com. July 16, 2018. Accessed December 08, 2018. https://www.bloomberg.com/news/articles/2018-07-16/trump-trash-talk-can-t-touch-the-nfl-packers-financials-reveal. ] Despite the influx of money into football and the increase in popularity, football never experienced the analytics revolution that baseball did. Given the number of loyal fans watching every game and the money on the line, it's more important now more than ever before that management makes sound, statistically-informed decisions. 
+
+Perhaps the largest responsibility that falls upon the management each year is deciding which players to choose in the annual NFL draft. The Draft is an event that occurs each Spring, in which each of the 32 NFL teams select one player in each of the seven rounds of the draft. The average career of an NFL player is 3.3 years; thus it is essential that management can bring in young talent each year. ^[“Average playing career length in the National Football League (in years).” Accessed 12/4/18, 06:33 PM. https://www.statista.com/statistics/240102/average-player-career-length-in-the-national-football-league/ ].  
+
+At 2.8 years, the career of a wide receiver position is even shorter than that of the average NFL player. Moreover, thirty-three wide receivers were drafted in Spring 2018, the second most of any position.^["NFL.com Draft 2018 - NFL Draft History: Full Draft Year." NFL.com. Accessed December 08, 2018. http://www.nfl.com/draft/history/fulldraft?type=position&position=WR. ]. Given the large number of wide receivers drafted and relatively average short career of NFL wide receivers, the performance of wide receivers in the NFL is a left-skewed distribution (preliminary plots of yards and touchdowns for WRs in their rookie year confirms this). For wide receivers the best information we have for each player before the draft is their performance in college and their NFL Combine results (The NFL Combine is a pre-draft event that measures the strength,speed, and agility of players). Can we predict how well a player will do in the NFL from their college and NFL Combine performance? 
+
+# Methods
+
+Data was collected from Pro Football Reference^[Pro-Football-Reference.com. Accessed December 1, 2018. https://www.pro-football-reference.com/.] and Airyards^[Airyards. Accessed December 1, 2018. http://airyards.com/.]. Data from each player's rookie season and combine data was obtained from Pro Football Reference and data from each player's final year in college was taken from Airyards. Only players whose rookie year was between 2011-2017 were considered. Due to the ever-changing nature of football, players were excluded due to the likelihood that the wide receiver archetype changed before this period. The choice of looking at only each player's final year in college and rookie year in the NFL was a choice made for the sake of simplicity. This was also done to control for the fact that not every player has played the same number of years in the NFL or in college. The only combine events considered were the forty-yard dash and vertical leap, too few wide receivers participated in the other events to include them in our dataset. After filtering out players for whom we did not have complete data, we were left with 87 players. 
+
+```{r echo=FALSE}
+#Set echo to be false globally
+knitr::opts_chunk$set(echo = FALSE,message=FALSE,warning=FALSE)
+
+# turn off scientific notation
+options(scipen = 999)
+
+# For compiling to PDF
+
+  # Sys.setenv(PATH = paste(Sys.getenv("PATH"), "C:\\Users\\trave\\AppData\\Local\\Programs\\MiKTeX
+  # 2.9\\miktex\\bin\\x64", sep=.Platform$path.sep))
+```
+
+```{r}
+# Load necessary libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lattice)
+library(GGally)
+library(broom)
+library(car)
+library(gridExtra)
+library(kableExtra)
+library(knitr)
+```
+
+```{r}
+# Read in our data
+data = read_csv("clean_data/finalWrDataset.csv")
+```
+
+
+The variable WrScore as a measure of each wide receiver's performance in their rookie year, where WrScore was defined as Yards + TDs\* 60. The distribution of WrScore was right-skewed so a log transformation was performed on the variable, thus the dependent variable in the analysis was Log(WrScore) or LogScore for short (see *Appendix 1* for the resulting distribution). To decide which predictors to include in the final model, univariate models of each predictor vs LogScore were fit. Those predictors significant at an $\alpha = 0.10$ significance level were added to the full model. After this process a height-weight interaction term was added to the model. It made sense to add this term because for taller players we expect an increase in weight to contribute more to their performance than for shorter players. Backward selection was used on the full model until only predictors significant at an $\alpha = 0.05$ significance level were left.
+
+After this process we were left with three predictors and four coefficients in our final model, *Height*,*Wt*,*Yards*, and (*Height\*Weight*). The variables not included in the final model were *Conf* (the college conference the wide receiver played in),*Rec* (number of receptions), *YdsCatch* (yards per catch), *TD* (number of touchdowns), *fourtyYD* (forty-yard dash time) and *Vertical* (vertical leap height). For more information on the variables in the dataset, reference the codebook. As seen in *Appendix 2*, there was at least a weak linear relationship between each of the predictors in our final model and the outcome variable (LogScore). Thus, I decided to continue with the final model chosen by my selection methods. 
+
+After the final model was fit, outliers were found by identifying points such that Cook's Distance > 1. There were no such points, so no further action was needed. To identify multicollinearity between predictors I fit a model without the interaction term. I calculated the Variance Inflation Factor (VIF) for that model, all VIF values were less than 2.5, indicating little multicollinearity. The residuals from the final model appeared to be somewhat left-skewed so the confidence intervals for the coefficients were constructed using bootstrap methods. 
+
+
+```{r, include=FALSE}
+#------------------#
+# Create our model #
+#------------------#
+
+# -------------------
+# Baseline Model #
+baseModel = lm(LogScore~1,data=data)
+
+# -------------------
+# LogScore vs College Yds
+yardsModel = lm(LogScore ~ Yds, data = data)
+
+data %>% ggplot(aes(x = Yds, y = LogScore)) + geom_point()
+
+# Look at the residuals
+yardsModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+yardsModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .1) 
+
+# -------------------
+# LogScore vs College YdsCatch
+catchModel = lm(LogScore ~ YdsCatch,data=data)
+
+data %>% ggplot(aes(x = YdsCatch, y = LogScore)) + geom_point()
+
+catchModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+# Look at the residuals
+catchModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+catchModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .002) 
+
+# --------------------
+# LogScore vs College TD
+
+tdModel = lm(LogScore ~ TD,data=data)
+
+data %>% ggplot(aes(x = TD, y = LogScore)) + geom_point()
+
+# Look at the residuals
+tdModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+tdModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .09) 
+
+# -------------------
+# LogScore vs Conf
+
+confModel = lm(LogScore ~ as.factor(Conf),data=data)
+
+data %>% ggplot(aes(x = as.factor(Conf), y = LogScore,color = as.factor(Conf)))  + geom_boxplot() + theme(axis.text.x=element_text(angle = -55, hjust = 0)) + labs(x = "Conference",y = "LogScore",color = "Conference") + ggtitle("LogScore by Conference")
+
+# Check for stat sig
+anova(confModel,baseModel)
+
+# -------------------
+# LogScore vs Height
+
+heightModel = lm(LogScore ~ Height,data=data)
+
+data %>% ggplot(aes(x = Height, y =LogScore)) + geom_point()
+
+# Look at the residuals
+heightModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+heightModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .098) 
+
+# -------------------
+# LogScore vs Weight
+
+weightModel = lm(LogScore ~ Wt,data=data)
+
+data %>% ggplot(aes(x = Wt, y = LogScore)) + geom_point()
+
+# Look at the residuals
+weightModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+weightModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .085) 
+
+# ------------------
+# LogScore vs 40Yd
+speedModel = lm(LogScore ~ fourtyYD ,data=data)
+
+data %>% ggplot(aes(x = fourtyYD, y = LogScore)) + geom_point() + geom_smooth(method = 'lm')
+
+# Look at the residuals
+speedModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+speedModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .015) 
+
+# ------------------
+# LogScore vs Vertical 
+jumpModel = lm(LogScore ~ Vertical ,data=data)
+
+data %>% ggplot(aes(x = Vertical, y = LogScore)) + geom_point()
+
+# Look at the residuals
+jumpModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+jumpModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .025) 
+
+# ------------------
+# LogScore vs Rec
+recModel = lm(LogScore ~ Rec ,data=data)
+
+data %>% ggplot(aes(x = Rec, y = LogScore)) + geom_point()
+
+# Look at the residuals
+recModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+recModel %>% ggplot(aes(x=.fitted)) + geom_histogram(binwidth = .04) 
+
+# -------------------
+# Fit the full model
+# -------------------
+
+# Final Model
+jointModel = lm(LogScore ~ Yds + Height*Wt,data=data)
+summary(jointModel)
+
+# Check for normality in the residuals
+jointModel %>% ggplot(aes(x= .fitted,y=.resid)) + geom_point()
+
+jointModel %>% ggplot(aes(x = .resid)) + geom_histogram(binwidth = .265) 
+
+
+# Check for multicollinearity
+noInteraction = lm(LogScore ~ Yds + Height + Wt,data=data)
+
+vif(noInteraction) # < 2.5, so we are good
+```
+
+
+```{r}
+# Create bootstrap confidence intervals for Betas because residuals are slightly left-skewed
+
+library(boot)
+library(tidyr)
+
+# Define a function to return coefficients of model from BS
+bs <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample
+  fit <- lm(formula, data=d)
+  return(coef(fit))
+} 
+
+# Set seed for reproducability
+set.seed(10)
+
+# Get bootstrap intervals for each coefficient
+# ----------------------
+
+bootObj = boot(data=data,statistic = bs,R= 5000,formula = jointModel)
+
+intBoot =boot.ci(bootObj, type="bca", index=1)$'bca'[4:5] 
+ydBoot = boot.ci(bootObj, type="bca", index=2)$'bca'[4:5] 
+heightBoot = boot.ci(bootObj, type="bca", index=3)$'bca'[4:5] 
+weightBoot = boot.ci(bootObj, type="bca", index=4)$'bca'[4:5] 
+htWtBoot = boot.ci(bootObj, type="bca", index=5)$'bca'[4:5] 
+
+# ----------------------
+
+# Create a table with the CIs
+# ----------------------
+
+boots = t(data.frame(intBoot))
+boots = rbind(boots,ydBoot)
+boots = rbind(boots,heightBoot)
+boots = rbind(boots,weightBoot)
+boots = rbind(boots,htWtBoot)
+boots = round(boots,4)
+boots = data.frame(boots)
+
+# Clean up the table
+bootTable = unite(boots,"95% Confidence Interval",sep=",",remove=TRUE)
+bootTable$`95% Confidence Interval` = paste( "(",bootTable$`95% Confidence Interval`,")",sep = "")
+bootTable =cbind(bootTable,round(jointModel$coefficients,4))
+bootTable = cbind(bootTable,round(summary(jointModel)$coefficients[,4],4) )
+names(bootTable)[2:3] = c("$\\beta$","p-value")
+bootTable = bootTable[c(2,1,3)]
+rownames(bootTable) = c("Intercept","Yds","Height","Wt","Height:Wt")
+
+# ----------------------
+```
+
+<br>
+
+# Results 
+
+Among the 87 rookie wide receivers the mean *LogScore* was `r round(mean(data$LogScore),2)` with a standard deviation of `r round(sd(data$LogScore),2)` units. For summary statistics of the predictors used in the model see *Table 1*. The three predictors in the final model were *Height* (the player's height in inches), *Wt* (the player's weight in pounds), and *Yds* (the number of receiving yards the player accumulated in their final year of college). 
+
+<div style= "float:right;position: relative;">
+```{r}
+library(kableExtra)
+
+# Calculate summary statistics for all of the predictors
+
+varTable = data.frame("Name" = c("Height","Wt","Yds"),
+  "Mean" = c(round(mean(data$Height),2),round(mean(data$Wt),2),round(mean(data$Yds),2)),
+                      
+  "Standard Deviation" = c(round(sd(data$Height),2),round(sd(data$Wt),2),round(sd(data$Yds),2)))
+
+kable(varTable,caption = "Table 1: Summary Statistics of Model Predictors") %>% kable_styling(bootstrap_options = "striped",full_width = F, position = "float_right") %>%
+  column_spec(1, bold = T, border_right = T) %>% row_spec(0,hline_after = T,bold= T,color = "black")
+```
+</div>
+
+The intercept of the model was `r round(jointModel$coeff['(Intercept)'],2)` [95% CI, `r bootTable$'95% Confidence Interval'[1] `]. Thus when all other variables  in the model are 0 ($X_i = 0,\forall i$), we expect a given player's *LogScore* to be `r round(jointModel$coeff['(Intercept)'],2)`. This is not a practical interpretation because no players have height or weight of 0. Due to the interaction term in our model, the effect of the *Height* and *Wt* on *LogScore* requires us to look at both the coefficient for those variables and the interaction term itself. 
+
+For a given weight *A* and for fixed number of yards, the expected increase in *LogScore* for each inch increase in height is (`r round(jointModel$coeff['Height:Wt'],2)`*A*  `r round(jointModel$coeff['Height'],2)`). Thus, if a given player weighs at least 199 pounds, there is a positive association between height and *LogScore*. Moreover, the increase in *LogScore* for each one inch increase in *Height* is larger the greater the player's weight.  
+<br>
+<br>
+<div style= "float:right;position: relative;">
+```{r}
+# Create a table of the final model predictors with confidence intervals
+
+kable(bootTable,caption = "Table 2: Final Model Predictors") %>% kable_styling(bootstrap_options = "striped",full_width = F, position = "float_right") %>%
+  column_spec(1, bold = T, border_right = T) %>% row_spec(0,hline_after = T,bold= T,color = "black")
+```
+</div>
+
+On the other hand if a given player weighs less than 199 pounds there is a negative association between height and *LogScore*. The lower the weight the greater the decrease in *LogScore* per inch increase in height. Similarly, for a player of given height *B*  and for a fixed number of yards, the expected increase in *LogScore* for each one-pound increase in weight is (`r round(jointModel$coeff['Height:Wt'],2)`*B*  `r round(jointModel$coeff['Wt'],2)`). If a given player is at least 72.5 inches tall there is a positive association between weight and *LogScore*. However, if a player is under 72.5 inches tall there is negative association between weight and *LogScore*. Again, the magnitude of the relationship between weight and *LogScore* depends how far the player's height is from 72.5 inches. See *Table 2* for confidence intervals for the height and weight coefficients. Adjusting for height and weight, the expected increase in *LogScore* for a one unit increase in *Yds* is `r bootTable$Beta[2] ` [95% CI, `r bootTable$'95% Confidence Interval'[2] `]. Thus, there is a positive association between *Yds* and *LogScore*. The r-squared of the final model was 0.18.
+
+<br>
+
+# Discussion
+
+Given the highly physical nature of American football it is not surprising that weight and height were statistically significant predictors of log WrScore. . Additionally, the relationship between *Yds* and *LogScore* is intuitive, the more yards a player has in college the more yards we would expect a player to have in the NFL and thus the higher the *LogScore* they will have. Despite the success that these variables had in predicting *LogScore*, the model had many limitations. 
+
+One type of player that my model does not account well for are small quick players. Players such as Antonio Brown (70\",186 lbs), Tyreek Hill (70\",186 lbs), Odell Beckham (71\",198 lbs), and Brandin Cooks (69\", 189 lbs) are among the best wide receivers in the NFL, however the model underpredicts their rookie year performance. All of these players are known for their evasiveness and ability to change direction quickly. We had hoped that including forty yard dash times of players would account for these types of players. However there are several problems with this. The forty-yard dash was not a statistically significant predictor of *LogScore* by itself (p = 0.79) or in the full model. Additionally, forty-yard dash is not necessarily a good measure of the type of quickness these smaller players exhibit. The forty-yard dash is a good measure of a player's unidirectional top speed, but not necessarily their acceleration or ability to change direction quickly. The 3-cone-drill and 20-yard shuttle drill are two Combine events that are designed to measure short-team speed and change of direction, however too few players participated in these event to use them in our model. It might be of benefit if scouts placed more emphasis on these events for wide receivers than they do on the forty-yard dash.
+
+The small sample size (87 players) also limited our ability to include some variables in our final model. *Conf* (the college conference of a player) had potential to predict variation in *LogScore*, however our sample size was not large enough for the predictor to be statistically significant (see *Appendix 3*). Often certain conferences tend to have certain play-styles or different strength of schedules that we thought might translate into different NFL performance across conferences. 
+
+There also may have been advanced statistics that could have better predicted wide receiver performance such as catch rate, hand size, catchable target rate, contested catch rate, and yards after catch. However, for many college football players these statistics either do not exist or are behind a paywall. 
+
+The final and largest limitation of the model was that many of the factors that influence a wide receiver's production are beyond their control. How a wide receiver performs in college and in the NFL depends of the strength of their team. A player that played great in college might not play well during their rookie year because the quarterback throwing to them is not very skilled. There are 51 other players on an NFL roster and the performance of each one who plays will affect how a given wide receiver plays. A good quarterback is nothing without a good offensive line to protect him and if the quarterback isn't protected well he will be unable to throw to his wide receiver well. The effectiveness of the passing game of a team also depends on the effectiveness of the run game. Despite all of these outside factors that affect the performance of a wide receiver, our model is able to capture almost 20\% of the variation in *LogScore*. 
+
+# Conclusion
+
+Football generates the most revenue out of any major sports league in the world. Now, more than ever, management must correctly assess they value of players they draft. We built a regression model with the goal of predicting the variance of wide receiver rookie year performance. The terms in the final model were height,weight, yards in final year of college, and a height-weight interaction term. Despite the many limitations of the model, the r-squared of the model was still 0.18. The interaction term indicates that larger players (who both have high weight and height) have a higher expected *LogScore*. Additionally, the more yards a receiver accumulates in college, the higher their expected *LogScore*. Though this model does not offer a comprehensive explanation of what wide receivers will succeed in the NFL, it provides some easily measurable predictors that indicate expected future success.
+
+# Appendix
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE}
+
+# Show distribution of depdendent variable before and after log transformation
+plot1 = data %>% ggplot(aes(x = WrScore)) + geom_histogram(binwidth = 200) + ggtitle("WrScore Distribution")
+plot2 = data %>% ggplot(aes(x = LogScore)) + geom_histogram(binwidth = 0.4) + ggtitle("Log WrScore Distribution")
+grid.arrange(plot1, plot2, ncol=2,bottom= "Appendix 1: WrScore and LogScore Distributions")
+```
+<br>
+
+```{r}
+# Plot the model predictors vs dependent variable
+
+plot3 = data %>% ggplot(aes(x = Yds, y = LogScore)) + geom_point() + geom_smooth(method = lm)
+plot4 = data %>% ggplot(aes(x = Height, y =LogScore)) + geom_point()+ geom_smooth(method = lm)
+plot5 = data %>% ggplot(aes(x = Wt, y = LogScore)) + geom_point()+ geom_smooth(method = lm)
+plot6 = data %>% ggplot(aes(x = Wt*Height, y = LogScore)) + geom_point()+ geom_smooth(method = lm)
+grid.arrange(plot3,plot4,plot5,ncol= 2,bottom = "Appendix 2: Predictors vs LogScore")
+```
+<br>
+
+```{r}
+
+#Show distribution of LogScore by Conference
+confBox = data %>% ggplot(aes(x = as.factor(Conf), y = LogScore,color = as.factor(Conf)))  + geom_boxplot() + theme(axis.text.x=element_text(angle = -55, hjust = 0))+ labs(x = "Conference",y = "LogScore",color = "Conference") + ggtitle("LogScore by Conference")
+grid.arrange(confBox,bottom = "Appendix 3: Distribution of LogScore by Conference")
+```
+
+# References 
+
